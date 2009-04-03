@@ -33,7 +33,11 @@ void f()
 		g_prime(waiting, jump_points);
 		
 		while (waiting)	{
-			cout << "\t\twait(...)" << endl;
+			cout << "-------------------------------------------" << endl;
+			cout << "\t}" << endl;
+			cout << "\twait(...)" << endl;
+			cout << "\t__tm_atomic {" << endl;
+			cout << "-------------------------------------------" << endl;
 			g_prime(waiting, jump_points);
 		}
 		cout << "\t\t..." << endl;
@@ -104,8 +108,6 @@ finish:
 void h()
 {
 	cout << "\t\th() {" << endl;
-	cout << "\t\t\t..." << endl;
-	cout << "\t\t\t// do some work." << endl;
 	cout << "\t\t\t..." << endl;
 	cout << "\t\t}" << endl;
 }
