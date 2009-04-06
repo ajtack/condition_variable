@@ -109,5 +109,7 @@ void h()
 {
 	cout << "\t\th() {" << endl;
 	cout << "\t\t\t..." << endl;
+	cout << "\t\t\twait();" << endl;
+	cout << "\t\t\t..." << endl;
 	cout << "\t\t}" << endl;
 }
