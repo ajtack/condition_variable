@@ -16,6 +16,7 @@ int main()	{
 	return 0;
 }
 
+using std::cerr;
 using std::cout;
 using std::endl;
 using std::stack;
@@ -23,10 +24,11 @@ using std::stack;
 void f()
 {
 	
-	cout << "f() {" << endl;
-	cout << "\t// before g ..." << endl;
+	cerr << "f() {" << endl;
+	cerr << "\t// before a non-transactional call to g ..." << endl;
 	g();
-	cout << "\t// after g ..." << endl;
+	cerr << "\t// after a non-transactional call to g ..." << endl;
+	cerr << endl;
 	
 	// In place of a regular call to g' (which would be as above)
 	{
@@ -38,7 +40,7 @@ void f()
 			tm_begin
 			__tm_atomic	{
 				if (first_time)	{
-					cout << "\t\t// before g' ..." << endl;
+					cerr << "\t\t// before g' ..." << endl;
 					env.outer.jumpPoint = &&after_g_prime;
 					g_prime(env);
 				}
@@ -48,7 +50,7 @@ void f()
 					
 			after_g_prime:
 				if (!env.active())
-					cout << "\t\t// after g' ..." << endl;
+					cerr << "\t\t// after g' ..." << endl;
 			}
 			tm_end
 			
@@ -59,40 +61,44 @@ void f()
 		} while(env.active());
 	}
 
-	cout << "\t..." << endl;
-	cout << "}" << endl;
+	cerr << "\t..." << endl;
+	cerr << "}" << endl;
 }
 
 __attribute__((tm_callable)) void g_prime(condition_variable_environment& env)
 {
-	cout << "\t\tg'() {" << endl;
-	cout << "\t\t\t..." << endl;
+	cerr << "\t\tg'() {" << endl;
+	cerr << "\t\t\t..." << endl;
 	
 	// Call to h' is replaced with...
 	h_prime(env);
 	
-	cout << "\t\t\t..." << endl;
+	cerr << "\t\t\t..." << endl;
 	
 	// Call to h' is replaced with...
 	h_prime(env);
 
-	cout << "\t\t\t..." << endl;
-	cout << "\t\t}" << endl;
+	cerr << "\t\t\t..." << endl;
+	cerr << "\t\t}" << endl;
 }
 
 void g()
 {
-	cout << "\tg() {" << endl;
-	cout << "\t\t..." << endl;
+	cerr << "\tg() {" << endl;
+	cerr << "\t\t..." << endl;
 	h();
-	cout << "\t\t..." << endl;
-	cout << "\t}" << endl;
+	cerr << "\t\t..." << endl;
+	cerr << "\t}" << endl;
 }
 
 __attribute__((tm_callable)) void h_prime(condition_variable_environment& env)
 {
-	cout << "\t\t\th'() {" << endl;
-	cout << "\t\t\t\t..." << endl;
+	int array[1024];
+	for (int i = 0; i < 1024; ++i)
+		array[i] = 0xdeadbeef;
+		
+	cerr << "\t\t\th'() {" << endl;
+	cerr << "\t\t\t\t..." << endl;
 
 	// In place of the wait() ...
 	{
@@ -103,7 +109,11 @@ __attribute__((tm_callable)) void h_prime(condition_variable_environment& env)
 		env.deactivate();
 	}
 	
-	cout << "\t\t\t\t..." << endl;
+	cerr << std::flush;
+	cout << "\t\t\t\tAfter first wait() call: " << endl;
+	for (int i = 0; i < 1024; ++i)
+		if (array[i] != 0xdeadbeef) cout << "\t\t\t\tCorruption at index " << i << endl;
+	cerr << "\t\t\t\t..." << endl;
 	
 	// In place of the wait() ...
 	{
@@ -114,21 +124,25 @@ __attribute__((tm_callable)) void h_prime(condition_variable_environment& env)
 		env.deactivate();
 	}
 	
-	cout << "\t\t\t\t..." << endl;
-	cout << "\t\t\t}" << endl;
+	cerr << std::flush;
+	cout << "\t\t\t\tAfter second wait() call: " << endl;
+	for (int i = 0; i < 1024; ++i)
+		if (array[i] != 0xdeadbeef) cout << "\t\t\t\tCorruption at index " << i << endl;
+	cerr << "\t\t\t\t..." << endl;
+	cerr << "\t\t\t}" << endl;
 	return;
 }
 
 void h()
 {
-	cout << "\t\th() {" << endl;
-	cout << "\t\t\t..." << endl;
-	cout << "\t\t\twait();" << endl;
-	cout << "\t\t\t..." << endl;
-	cout << "\t\t}" << endl;
+	cerr << "\t\th() {" << endl;
+	cerr << "\t\t\t..." << endl;
+	cerr << "\t\t\twait();" << endl;
+	cerr << "\t\t\t..." << endl;
+	cerr << "\t\t}" << endl;
 }
 
 void wait(int x, int y)
 {
-	cout << "\twait(...)" << endl;
+	cerr << "\twait(...)" << endl;
 }
