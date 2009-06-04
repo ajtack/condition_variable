@@ -2,27 +2,29 @@ typedef void* label;
 
 #define ADDRESS_OF_LABEL(label_name) &&label_name
 
-#define GOTO(target) asm("jmp *%0" \
-                         : /* No output registers */ \
-						 : "r" (target) );
-
-#define SET_STACK_AND_GOTO(sourceStack, targetStack, targetJumpAddress) \
-	asm volatile("movl %%ebp, %0;"     \
-	             "pusha;"              \
-		         "movl %2, %%eax;"     \
+#define SET_STACK_AND_PIC_AND_GOTO(targetStack, targetPic, targetJumpAddress) \
+	asm volatile("pusha;"              \
+		         "movl %0, %%eax;"     \
 	             "movl %1, %%ebp;"     \
+	             "movl %2, %%ebx;"     \
 	             "jmp *%%eax;"         \
-	             : "=mx" (sourceStack) \
-	             : "r"  (targetStack), "r" (targetJumpAddress) \
-	             : "memory");  // "memory" => clobber ALL registers. This is on purpose, so that no leftovers are used after the goto.
+	             :                     \
+	             : "r" (targetJumpAddress), "r" (targetStack), "r" (targetPic) \
+	             : "memory", "eax"); // We explicitly do not label ebx and ebp.
 	
-#define RESTORE_STACK_AND_GOTO(targetStack, targetJumpAddress) \
-	asm volatile ("movl %1, %%eax;"    \
-	              "movl %0, %%ebp;"    \
+#define RESTORE_STACK_AND_PIC_AND_GOTO(targetStack, targetPic, targetJumpAddress) \
+	asm volatile ("movl %0, %%eax;"    \
+	              "movl %1, %%ebp;"    \
+	              "movl %2, %%ebx;"    \
 	              "jmp *%%eax;"        \
 	              "popa;"              \
 	              :                    \
-	              : "r" (targetStack), "r" (targetJumpAddress) \
-	              : "memory", "eax", "ebp");
+	              : "r" (targetJumpAddress), "r" (targetStack), "r" (targetPic)  \
+	              : "memory", "eax"); // We explicitly do not label ebx and ebp.
 	
-#define SET_STACK_BASE(target)     asm("movl %%ebp, %0": "=r" (target));
+#define STORE_STACK_BASE_AND_PIC(stack_base, pic) \
+	asm("movl %%ebp, %0;"                       \
+	    "movl %%ebx, %1;"                       \
+	    : "=m" (stack_base), "=m" (pic)         \
+	    :                                       \
+	    : "memory");

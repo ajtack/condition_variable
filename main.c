@@ -33,10 +33,9 @@ void f()
 	//	fprintf(stderr, "\t}\n");
 	//
 	// Becomes:
-	
-	TM_ATOMIC(A,
-		fprintf(stderr, "HI.\n");
-	);
+	TM_ATOMIC(A, 
+		condition_variable_environment_call(A, g);
+	)
 
 	fprintf(stderr, "\t// ...\n");
 	fprintf(stderr, "}\n");
@@ -110,9 +109,10 @@ __attribute__((tm_callable)) void h_prime(condition_variable_environment_t* cons
 
 	// In place of the wait() ...
 	{
+		STORE_STACK_BASE_AND_PIC(env->inner_frame.stack_base, env->inner_frame.pic);
 		env->inner_frame.jump_point = ADDRESS_OF_LABEL(after_wait_1);
 		env->active = true;
-		SET_STACK_AND_GOTO(env->inner_frame.stack_base, env->outer_frame.stack_base, env->outer_frame.jump_point);
+		SET_STACK_AND_PIC_AND_GOTO(env->outer_frame.stack_base, env->outer_frame.pic, env->outer_frame.jump_point);
 		
 	after_wait_1:
 		env->active = false;
@@ -122,15 +122,17 @@ __attribute__((tm_callable)) void h_prime(condition_variable_environment_t* cons
 	
 	// In place of the wait() ...
 	{
+		STORE_STACK_BASE_AND_PIC(env->inner_frame.stack_base, env->inner_frame.pic);
 		env->inner_frame.jump_point = ADDRESS_OF_LABEL(after_wait_2);
 		env->active = true;
-		SET_STACK_AND_GOTO(env->inner_frame.stack_base, env->outer_frame.stack_base, env->outer_frame.jump_point);
+		SET_STACK_AND_PIC_AND_GOTO(env->inner_frame.stack_base, env->outer_frame.pic, env->outer_frame.jump_point);
 		
 	after_wait_2:
 		env->active = false;
 	}
 	
 	fprintf(stderr, "\t\t\t\tAfter second wait() call... \n");
+	fprintf(stderr, "\t\t\t\t...\n");
 	fprintf(stderr, "\t\t\t}\n");
 	return;
 }
