@@ -16,7 +16,7 @@ int main()	{
 
 void f()
 {
-	fprintf(stderr, "f() {\n");
+	fprintf(stderr, "f()\n{\n");
 	fprintf(stderr, "\t// before a non-transactional call to g ...\n");
 	g();
 	fprintf(stderr, "\t// after a non-transactional call to g ...\n");
@@ -33,9 +33,43 @@ void f()
 	//	fprintf(stderr, "\t}\n");
 	//
 	// Becomes:
-	TM_ATOMIC(A, 
-		condition_variable_environment_call(A, g);
-	)
+	{
+		_Bool first_time = 1;
+		condition_variable_environment_t env_A = { .active = 0 };
+		asm("movl %%ebp, %0;" "movl %%ebx, %1;"
+		    : "=m" (env_A.outer_frame.stack_base), "=m" (env_A.outer_frame.pic)
+		    :
+		    : "memory");
+		;
+		
+		do {
+			fprintf(__stderrp, "\t__tm_atomic\n\t{\n");
+			
+			if (first_time) {
+				fprintf(__stderrp, "\t\t// before function ...\n");
+				env_A.outer_frame.jump_point = &&after_g38;
+				g_prime(&env_A);
+			} else {
+				asm volatile ("movl %0, %%eax;" "movl %1, %%ebp;" "movl %2, %%ebx;" "jmp *%%eax;" "popa;" : : "r" (env_A.inner_frame.jump_point), "r" (env_A.inner_frame.stack_base), "r" (env_A.inner_frame.pic) : "memory", "eax");
+				;
+			}
+			
+		after_g38:
+			if (!env_A.active) {
+				fprintf(__stderrp, "\t\t// after function ...\n");
+			} else {
+				goto A_end;
+			};
+			
+		A_end:
+			first_time = 0;
+			fprintf(__stderrp, "\t}\n");
+			if (env_A.active) {
+				fprintf(__stderrp, "\t\t// WAIT!\n");
+			}
+		} while(env_A.active);
+	}
+ 
 
 	fprintf(stderr, "\t// ...\n");
 	fprintf(stderr, "}\n");
@@ -50,7 +84,7 @@ void f()
  */
 void g()
 {
-	fprintf(stderr, "\tg() {\n");
+	fprintf(stderr, "\tg()\n\t{\n");
 	fprintf(stderr, "\t\t...\n");
 	h();
 	h();
@@ -66,7 +100,7 @@ void g()
  */
 __attribute__((tm_callable)) void g_prime(condition_variable_environment_t* const env)
 {
-	fprintf(stderr, "\t\tg'() {\n");
+	fprintf(stderr, "\t\tg'()\n\t\t{\n");
 	fprintf(stderr, "\t\t\t...\n");
 	
 	// Call to h is replaced with...
@@ -89,7 +123,7 @@ __attribute__((tm_callable)) void g_prime(condition_variable_environment_t* cons
  */
 void h()
 {
-	fprintf(stderr, "\t\th() {\n");
+	fprintf(stderr, "\t\th()\n\t\t{\n");
 	fprintf(stderr, "\t\t\t...\n");
 	fprintf(stderr, "\t\t\twait();\n");
 	fprintf(stderr, "\t\t\t...\n");
@@ -104,7 +138,7 @@ void h()
  */
 __attribute__((tm_callable)) void h_prime(condition_variable_environment_t* const env)
 {		
-	fprintf(stderr, "\t\t\th'() {\n");
+	fprintf(stderr, "\t\t\th'()\n\t\t\t{\n");
 	fprintf(stderr, "\t\t\t\t...\n");
 
 	// In place of the wait() ...
@@ -125,7 +159,7 @@ __attribute__((tm_callable)) void h_prime(condition_variable_environment_t* cons
 		STORE_STACK_BASE_AND_PIC(env->inner_frame.stack_base, env->inner_frame.pic);
 		env->inner_frame.jump_point = ADDRESS_OF_LABEL(after_wait_2);
 		env->active = true;
-		SET_STACK_AND_PIC_AND_GOTO(env->inner_frame.stack_base, env->outer_frame.pic, env->outer_frame.jump_point);
+		SET_STACK_AND_PIC_AND_GOTO(env->outer_frame.stack_base, env->outer_frame.pic, env->outer_frame.jump_point);
 		
 	after_wait_2:
 		env->active = false;
