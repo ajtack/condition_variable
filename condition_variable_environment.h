@@ -31,6 +31,8 @@ typedef struct condition_variable_environment
 		                                                                      \
 		do {                                                                  \
 			fprintf(stderr, "\t__tm_atomic\n\t{\n");                          \
+				if (env_##tmid.active)                                        \
+					GOTO(env_##tmid.current_downcall);                        \
 				code                                                          \
 			                                                                  \
 			tmid##_end:                                                       \
@@ -39,7 +41,6 @@ typedef struct condition_variable_environment
 			first_time = false;                                               \
 			if (env_##tmid.active) {                                          \
 				fprintf(stderr, "\t\t// WAIT!\n");                            \
-				GOTO(env_##tmid.current_downcall);                            \
 			}                                                                 \
 		} while(env_##tmid.active);                                           \
 	}                                                                         \
