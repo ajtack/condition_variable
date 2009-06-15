@@ -15,6 +15,7 @@ typedef struct condition_variable_environment
 	frame_t inner_frame;
 	frame_t outer_frame;
 	bool active;
+	label current_downcall;
 } condition_variable_environment_t;
 
 
@@ -22,50 +23,35 @@ typedef struct condition_variable_environment
 #define TM_ATOMIC(tmid, code)                                                 \
 	{                                                                         \
 		bool first_time = true;                                               \
-		condition_variable_environment_t env_##tmid = { .active = false };    \
-		STORE_STACK_BASE_AND_PIC(env_A.outer_frame.stack_base,                \
-		                         env_A.outer_frame.pic);                      \
+		condition_variable_environment_t env_##tmid =                         \
+			{ .active = false, .current_downcall = NULL };                    \
+		                                                                      \
+		STORE_STACK_BASE_AND_PIC(env_##tmid.outer_frame.stack_base,           \
+		                         env_##tmid.outer_frame.pic);                 \
 		                                                                      \
 		do {                                                                  \
 			fprintf(stderr, "\t__tm_atomic\n\t{\n");                          \
-			code                                                              \
+				code                                                          \
 			                                                                  \
-		tmid##_end:                                                           \
-			first_time = false;                                               \
-			                                                                  \
+			tmid##_end:                                                       \
 			fprintf(stderr, "\t}\n");                                         \
+			                                                                  \
+			first_time = false;                                               \
 			if (env_##tmid.active) {                                          \
 				fprintf(stderr, "\t\t// WAIT!\n");                            \
+				GOTO(env_##tmid.current_downcall);                            \
 			}                                                                 \
 		} while(env_##tmid.active);                                           \
-	}
-//	{                                                                      \
-	// 	bool first_time = true;                                            \
-	// 	condition_variable_environment_t env_##tmid = { .active = false }; \
-	// 	STORE_STACK_BASE_AND_PIC(env_##tmid.outer_frame.stack_base,        \
-	// 	                         env_##tmid.outer_frame.pic);              \
-	// 	                                                                   \
-	// 	do {                                                               \
-	// 		fprintf(stderr, "\t__tm_atomic	{\n");                         \
-	// 			code                                                       \
-	// 			                                                           \
-	// 		tmid##_end:                                                    \
-	// 			first_time = false;                                        \
-	// 			                                                           \
-	// 			fprintf(stderr, "\t}\n");                                  \
-	// 			if (env_##tmid.active) {                                   \
-	// 				fprintf(stderr, "\t\t// WAIT!\n");                     \
-	// 			}                                                          \
-	// 	} while(env_##tmid.active);                                        \
-	// }                                                                      \
+	}                                                                         \
 
 #endif
 
 
 #ifndef condition_variable_environment_call
 #define condition_variable_environment_call(tmid, function)                           \
+	MAKE_LABEL(before_, function, __LINE__):                                          \
+	                                                                                  \
 	if (first_time)	{                                                                 \
-		fprintf(stderr, "\t\t// before function ...\n");                              \
 		env_##tmid.outer_frame.jump_point = &&MAKE_LABEL(after_, function, __LINE__); \
 		function##_prime(&env_##tmid);                                                \
 	}                                                                                 \
@@ -75,12 +61,12 @@ typedef struct condition_variable_environment
 	}                                                                                 \
 	                                                                                  \
 	MAKE_LABEL(after_, function, __LINE__):                                           \
-		if (!env_##tmid.active) {                                                     \
-			fprintf(stderr, "\t\t// after function ...\n");                           \
-		}                                                                             \
-		else {                                                                        \
-			goto tmid##_end;                                                          \
-		}                                                                             \
+	if (env_##tmid.active) {                                                          \
+		env_##tmid.current_downcall = &&MAKE_LABEL(before_, function, __LINE__);      \
+		goto tmid##_end;                                                              \
+	} else {                                                                          \
+		env_##tmid.current_downcall = NULL;                                           \
+	}                                                                                 \
 
 #endif
 
