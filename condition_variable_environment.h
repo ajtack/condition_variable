@@ -19,26 +19,45 @@ typedef struct condition_variable_environment
 
 
 #ifndef TM_ATOMIC
-#define TM_ATOMIC(tmid, code)                                              \
-	{                                                                      \
-		bool first_time = true;                                            \
-		condition_variable_environment_t env_##tmid = { .active = false }; \
-		STORE_STACK_BASE_AND_PIC(env_##tmid.outer_frame.stack_base,        \
-		                         env_##tmid.outer_frame.pic);              \
-		                                                                   \
-		do {                                                               \
-			fprintf(stderr, "\t__tm_atomic	{\n");                         \
-				code                                                       \
-				                                                           \
-			tmid##_end:                                                    \
-				first_time = false;                                        \
-				                                                           \
-				fprintf(stderr, "\t}\n");                                  \
-				if (env_##tmid.active) {                                   \
-					fprintf(stderr, "\t\t// WAIT!\n");                     \
-				}                                                          \
-		} while(env_##tmid.active);                                        \
-	}                                                                      \
+#define TM_ATOMIC(tmid, code)                                                 \
+	{                                                                         \
+		bool first_time = true;                                               \
+		condition_variable_environment_t env_##tmid = { .active = false };    \
+		STORE_STACK_BASE_AND_PIC(env_A.outer_frame.stack_base,                \
+		                         env_A.outer_frame.pic);                      \
+		                                                                      \
+		do {                                                                  \
+			fprintf(stderr, "\t__tm_atomic\n\t{\n");                          \
+			code                                                              \
+			                                                                  \
+		tmid##_end:                                                           \
+			first_time = false;                                               \
+			                                                                  \
+			fprintf(stderr, "\t}\n");                                         \
+			if (env_##tmid.active) {                                          \
+				fprintf(stderr, "\t\t// WAIT!\n");                            \
+			}                                                                 \
+		} while(env_##tmid.active);                                           \
+	}
+//	{                                                                      \
+	// 	bool first_time = true;                                            \
+	// 	condition_variable_environment_t env_##tmid = { .active = false }; \
+	// 	STORE_STACK_BASE_AND_PIC(env_##tmid.outer_frame.stack_base,        \
+	// 	                         env_##tmid.outer_frame.pic);              \
+	// 	                                                                   \
+	// 	do {                                                               \
+	// 		fprintf(stderr, "\t__tm_atomic	{\n");                         \
+	// 			code                                                       \
+	// 			                                                           \
+	// 		tmid##_end:                                                    \
+	// 			first_time = false;                                        \
+	// 			                                                           \
+	// 			fprintf(stderr, "\t}\n");                                  \
+	// 			if (env_##tmid.active) {                                   \
+	// 				fprintf(stderr, "\t\t// WAIT!\n");                     \
+	// 			}                                                          \
+	// 	} while(env_##tmid.active);                                        \
+	// }                                                                      \
 
 #endif
 

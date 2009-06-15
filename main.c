@@ -33,46 +33,14 @@ void f()
 	//	fprintf(stderr, "\t}\n");
 	//
 	// Becomes:
-	{
-		_Bool first_time = 1;
-		condition_variable_environment_t env_A = { .active = 0 };
-		asm("movl %%ebp, %0;"
-		    "movl %%ebx, %1;"
-		    : "=m" (env_A.outer_frame.stack_base), "=m" (env_A.outer_frame.pic)
-		    :
-		    : "memory");
-		;
-		
-		do {
-			fprintf(__stderrp, "\t__tm_atomic\n\t{\n");
-			
-			if (first_time) {
-				fprintf(__stderrp, "\t\t// before function ...\n");
-				env_A.outer_frame.jump_point = &&after_g38;
-				g_prime(&env_A);
-			} else {
-				asm volatile ("movl %0, %%eax;" "movl %1, %%ebp;" "movl %2, %%ebx;" "jmp *%%eax;" : : "r" (env_A.inner_frame.jump_point), "r" (env_A.inner_frame.stack_base), "r" (env_A.inner_frame.pic) : "memory", "eax");
-				;
-			}
-			
-		after_g38:
-			if (!env_A.active) {
-				fprintf(__stderrp, "\t\t// after function ...\n");
-			} else {
-				goto A_end;
-			};
-			
-		A_end:
-			first_time = 0;
-			fprintf(__stderrp, "\t}\n");
-			if (env_A.active) {
-				fprintf(__stderrp, "\t\t// WAIT!\n");
-			}
-		} while(env_A.active);
-	}
- 
+	TM_ATOMIC(A,
+		fprintf(stdout, "Midagi siia läheb...\n");
+		condition_variable_environment_call(A, g)
+		fprintf(stdout, "Midagi siia ka läheb...\n");
+	)
 
 	fprintf(stderr, "\t// ...\n");
+	fprintf(stderr, "Valmis!\n");
 	fprintf(stderr, "}\n");
 }
 
