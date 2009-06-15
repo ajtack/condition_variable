@@ -36,7 +36,8 @@ void f()
 	{
 		_Bool first_time = 1;
 		condition_variable_environment_t env_A = { .active = 0 };
-		asm("movl %%ebp, %0;" "movl %%ebx, %1;"
+		asm("movl %%ebp, %0;"
+		    "movl %%ebx, %1;"
 		    : "=m" (env_A.outer_frame.stack_base), "=m" (env_A.outer_frame.pic)
 		    :
 		    : "memory");
@@ -50,7 +51,7 @@ void f()
 				env_A.outer_frame.jump_point = &&after_g38;
 				g_prime(&env_A);
 			} else {
-				asm volatile ("movl %0, %%eax;" "movl %1, %%ebp;" "movl %2, %%ebx;" "jmp *%%eax;" "popa;" : : "r" (env_A.inner_frame.jump_point), "r" (env_A.inner_frame.stack_base), "r" (env_A.inner_frame.pic) : "memory", "eax");
+				asm volatile ("movl %0, %%eax;" "movl %1, %%ebp;" "movl %2, %%ebx;" "jmp *%%eax;" : : "r" (env_A.inner_frame.jump_point), "r" (env_A.inner_frame.stack_base), "r" (env_A.inner_frame.pic) : "memory", "eax");
 				;
 			}
 			
@@ -87,6 +88,7 @@ void g()
 	fprintf(stderr, "\tg()\n\t{\n");
 	fprintf(stderr, "\t\t...\n");
 	h();
+	fprintf(stderr, "\t\t...\n");
 	h();
 	fprintf(stderr, "\t\t...\n");
 	fprintf(stderr, "\t}\n");

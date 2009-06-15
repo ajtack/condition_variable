@@ -3,8 +3,7 @@ typedef void* label;
 #define ADDRESS_OF_LABEL(label_name) &&label_name
 
 #define SET_STACK_AND_PIC_AND_GOTO(targetStack, targetPic, targetJumpAddress) \
-	asm volatile("pusha;"              \
-		         "movl %0, %%eax;"     \
+	asm volatile("movl %0, %%eax;"     \
 	             "movl %1, %%ebp;"     \
 	             "movl %2, %%ebx;"     \
 	             "jmp *%%eax;"         \
@@ -17,7 +16,6 @@ typedef void* label;
 	              "movl %1, %%ebp;"    \
 	              "movl %2, %%ebx;"    \
 	              "jmp *%%eax;"        \
-	              "popa;"              \
 	              :                    \
 	              : "r" (targetJumpAddress), "r" (targetStack), "r" (targetPic)  \
 	              : "memory", "eax"); // We explicitly do not label ebx and ebp.
