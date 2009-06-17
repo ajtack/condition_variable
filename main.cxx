@@ -1,13 +1,10 @@
-#include <iostream>
-#include <stack>
-#include <setjmp.h>
-#include "condition_variable_environment.hxx"
-#include "tm_emulate.hxx"
+#include <stdio.h>
+#include "condition_variable_environment.h"
 
 void f();
-void g_prime(condition_variable_environment& env);
+void g_prime(condition_variable_environment_t* const env);
 void g();
-void h_prime(condition_variable_environment& env);
+void h_prime(condition_variable_environment_t* const env);
 void h();
 void wait(int, int);
 
@@ -16,133 +13,130 @@ int main()	{
 	return 0;
 }
 
-using std::cerr;
-using std::cout;
-using std::endl;
-using std::stack;
 
 void f()
 {
-	
-	cerr << "f() {" << endl;
-	cerr << "\t// before a non-transactional call to g ..." << endl;
+	fprintf(stderr, "f()\n{\n");
+	fprintf(stderr, "\t// before a non-transactional call to g ...\n");
 	g();
-	cerr << "\t// after a non-transactional call to g ..." << endl;
-	cerr << endl;
+	fprintf(stderr, "\t// after a non-transactional call to g ...\n");
+	fprintf(stderr, "\n");
 	
-	// In place of a regular call to g' (which would be as above)
-	{
-		bool first_time = true;
-		condition_variable_environment env;
-		SET_STACK_BASE(env.outer.stackBase);
-		
-		do {
-			tm_begin
-			__tm_atomic	{
-				if (first_time)	{
-					cerr << "\t\t// before g' ..." << endl;
-					env.outer.jumpPoint = &&after_g_prime;
-					g_prime(env);
-				}
-				else	{
-					RESTORE_STACK_AND_GOTO(env.inner.stackBase, env.inner.jumpPoint);
-				}
-					
-			after_g_prime:
-				if (!env.active())
-					cerr << "\t\t// after g' ..." << endl;
-			}
-			tm_end
-			
-			if (env.active())
-				wait(7, 3);
-			
-			first_time = false;
-		} while(env.active());
-	}
+	// This block...
+	//
+	// 	fprintf(stderr, "\t__tm_atomic {\n")
+	// 	__tm_atomic {
+	//		fprintf(stderr, "\t\t// before g() ...\n");
+	// 		g();
+	//		fprintf(stderr, "\t\t// after g() ...\n");
+	// 	}
+	//	fprintf(stderr, "\t}\n");
+	//
+	// Becomes:
+	TM_ATOMIC(A,
+		fprintf(stdout, "Midagi siia läheb...\n");
+		condition_variable_environment_call(A, g)
+		fprintf(stdout, "Midagi siia ka läheb...\n");
+	)
 
-	cerr << "\t..." << endl;
-	cerr << "}" << endl;
+	fprintf(stderr, "\t// ...\n");
+	fprintf(stderr, "Valmis!\n");
+	fprintf(stderr, "}\n");
 }
 
-__attribute__((tm_callable)) void g_prime(condition_variable_environment& env)
-{
-	cerr << "\t\tg'() {" << endl;
-	cerr << "\t\t\t..." << endl;
-	
-	// Call to h' is replaced with...
-	h_prime(env);
-	
-	cerr << "\t\t\t..." << endl;
-	
-	// Call to h' is replaced with...
-	h_prime(env);
 
-	cerr << "\t\t\t..." << endl;
-	cerr << "\t\t}" << endl;
-}
-
+/*
+ * g() -- Non-Transactional version.
+ *
+ * This is what the programmer writes. Ideally, in an annotated STM, the tm_callable
+ * attribute will suffice.
+ */
 void g()
 {
-	cerr << "\tg() {" << endl;
-	cerr << "\t\t..." << endl;
+	fprintf(stderr, "\tg()\n\t{\n");
+	fprintf(stderr, "\t\t...\n");
 	h();
-	cerr << "\t\t..." << endl;
-	cerr << "\t}" << endl;
+	fprintf(stderr, "\t\t...\n");
+	h();
+	fprintf(stderr, "\t\t...\n");
+	fprintf(stderr, "\t}\n");
 }
 
-__attribute__((tm_callable)) void h_prime(condition_variable_environment& env)
+
+/*
+ * g() -- Transactional Version
+ *
+ * This is generated from g() by the compiler.
+ */
+__attribute__((tm_callable)) void g_prime(condition_variable_environment_t* const env)
 {
-	int array[1024];
-	for (int i = 0; i < 1024; ++i)
-		array[i] = 0xdeadbeef;
-		
-	cerr << "\t\t\th'() {" << endl;
-	cerr << "\t\t\t\t..." << endl;
+	fprintf(stderr, "\t\tg'()\n\t\t{\n");
+	fprintf(stderr, "\t\t\t...\n");
+	
+	// Call to h is replaced with...
+	h_prime(env);
+	
+	fprintf(stderr, "\t\t\t...\n");
+	
+	// Call to h is replaced with...
+	h_prime(env);
 
-	// In place of the wait() ...
-	{
-		env.activate(&&after_wait_1);
-		SET_STACK_AND_GOTO(env.inner.stackBase, env.outer.stackBase, env.outer.jumpPoint);
-		
-	after_wait_1:
-		env.deactivate();
-	}
-	
-	cerr << std::flush;
-	cout << "\t\t\t\tAfter first wait() call: " << endl;
-	for (int i = 0; i < 1024; ++i)
-		if (array[i] != 0xdeadbeef) cout << "\t\t\t\tCorruption at index " << i << endl;
-	cerr << "\t\t\t\t..." << endl;
-	
-	// In place of the wait() ...
-	{
-		env.activate(&&after_wait_2);
-		SET_STACK_AND_GOTO(env.inner.stackBase, env.outer.stackBase, env.outer.jumpPoint);
-		
-	after_wait_2:
-		env.deactivate();
-	}
-	
-	cerr << std::flush;
-	cout << "\t\t\t\tAfter second wait() call: " << endl;
-	for (int i = 0; i < 1024; ++i)
-		if (array[i] != 0xdeadbeef) cout << "\t\t\t\tCorruption at index " << i << endl;
-	cerr << "\t\t\t\t..." << endl;
-	cerr << "\t\t\t}" << endl;
-	return;
+	fprintf(stderr, "\t\t\t...\n");
+	fprintf(stderr, "\t\t}\n");
 }
 
+
+/*
+ * h() -- Non-Transactional version.
+ *
+ * This is what the programmer writes.
+ */
 void h()
 {
-	cerr << "\t\th() {" << endl;
-	cerr << "\t\t\t..." << endl;
-	cerr << "\t\t\twait();" << endl;
-	cerr << "\t\t\t..." << endl;
-	cerr << "\t\t}" << endl;
+	fprintf(stderr, "\t\th()\n\t\t{\n");
+	fprintf(stderr, "\t\t\t...\n");
+	fprintf(stderr, "\t\t\twait();\n");
+	fprintf(stderr, "\t\t\t...\n");
+	fprintf(stderr, "\t\t}\n");
 }
 
-void wait(int x, int y)
-{
-	cerr << "\twait(...)" << endl;
+
+/*
+ * h() -- Transactional version.
+ *
+ * This is generated from h() by the compiler.
+ */
+__attribute__((tm_callable)) void h_prime(condition_variable_environment_t* const env)
+{		
+	fprintf(stderr, "\t\t\th'()\n\t\t\t{\n");
+	fprintf(stderr, "\t\t\t\t...\n");
+
+	// In place of the wait() ...
+	{
+		STORE_STACK_BASE_AND_PIC(env->inner_frame.stack_base, env->inner_frame.pic);
+		env->inner_frame.jump_point = ADDRESS_OF_LABEL(after_wait_1);
+		env->active = true;
+		SET_STACK_AND_PIC_AND_GOTO(env->outer_frame.stack_base, env->outer_frame.pic, env->outer_frame.jump_point);
+		
+	after_wait_1:
+		env->active = false;
+	}
+	
+	fprintf(stderr, "\t\t\t\tAfter first wait() call... \n");
+	
+	// In place of the wait() ...
+	{
+		STORE_STACK_BASE_AND_PIC(env->inner_frame.stack_base, env->inner_frame.pic);
+		env->inner_frame.jump_point = ADDRESS_OF_LABEL(after_wait_2);
+		env->active = true;
+		SET_STACK_AND_PIC_AND_GOTO(env->outer_frame.stack_base, env->outer_frame.pic, env->outer_frame.jump_point);
+		
+	after_wait_2:
+		env->active = false;
+	}
+	
+	fprintf(stderr, "\t\t\t\tAfter second wait() call... \n");
+	fprintf(stderr, "\t\t\t\t...\n");
+	fprintf(stderr, "\t\t\t}\n");
+	return;
 }
