@@ -30,13 +30,14 @@ typedef struct condition_variable_environment
 		                         env_##tmid.outer_frame.pic);                 \
 		                                                                      \
 		do {                                                                  \
-			fprintf(stderr, "\t__tm_atomic\n\t{\n");                          \
+			__tm_atomic {                                                     \
 				if (env_##tmid.active)                                        \
 					GOTO(env_##tmid.current_downcall);                        \
+					                                                          \
 				code                                                          \
-			                                                                  \
+				                                                              \
 			tmid##_end:                                                       \
-			fprintf(stderr, "\t}\n");                                         \
+			}                                                                 \
 			                                                                  \
 			first_time = false;                                               \
 			if (env_##tmid.active) {                                          \

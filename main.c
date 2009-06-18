@@ -33,14 +33,16 @@ void f()
 	//	fprintf(stderr, "\t}\n");
 	//
 	// Becomes:
+	fprintf(stderr, "\t__tm_atomic {\n");
 	TM_ATOMIC(A,
-		fprintf(stdout, "Midagi siia läheb...\n");
+		fprintf(stdout, "\t\tMidagi siia läheb...\n");
 		condition_variable_environment_call(A, g)
-		fprintf(stdout, "Midagi siia ka läheb...\n");
+		fprintf(stdout, "\t\tKa siia läheb midagi...\n");
 	)
+	fprintf(stderr, "\t}\n");
 
 	fprintf(stderr, "\t// ...\n");
-	fprintf(stderr, "Valmis!\n");
+	fprintf(stderr, "\tFunktsioon f on valmis!\n");
 	fprintf(stderr, "}\n");
 }
 
