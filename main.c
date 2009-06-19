@@ -8,14 +8,23 @@
 // Some global condition which allows us to check actual waiting.
 static cond_event_t the_global_condition;
 
+// Functions which run the experiment across threads.
 void* run_f(void*);
 void* signal_condition(void*);
+
+// Function which encloses the transaction.
 void f();
-void g_prime(condition_variable_environment_t* const env);
+
+// Functions taking no arguments
 void g();
-void h_prime(condition_variable_environment_t* const env);
+void g_prime(condition_variable_environment_t* const env);
+
 void h();
-void wait(int, int);
+void h_prime(condition_variable_environment_t* const env);
+
+// Functions taking some arguments
+void i(int something, char something_else);
+void i_prime(condition_variable_environment_t* const env, int something, char something_else);
 
 
 int main()	{
@@ -71,14 +80,22 @@ void f()
 	//
 	// Becomes:
 	fprintf(stderr, "\t__tm_atomic {\n");
-	TM_ATOMIC(A,
+	TM_ATOMIC(SOMETHING_UNIQUE,
 		fprintf(stdout, "\t\tMidagi siia läheb...\n");
-		condition_variable_environment_call(A, g)
+		condition_variable_environment_call(SOMETHING_UNIQUE, g);
 		fprintf(stdout, "\t\tKa siia läheb midagi...\n");
 	)
 	fprintf(stderr, "\t}\n");
+	
+	// Another one, this time passing arguments to a function.
+	fprintf(stderr, "\t__tm_atomic {\n");
+	TM_ATOMIC(SOMETHING_ELSE_UNIQUE,
+		fprintf(stdout, "\t\tNüüd teeme midagi teistmoodi...\n");
+		condition_variable_environment_call(SOMETHING_ELSE_UNIQUE, i, 15, 'x');
+		fprintf(stdout, "\t\tJa veel üks kord tegeleme...\n");
+	)
+	fprintf(stderr, "\t}\n");
 
-	fprintf(stderr, "\t// ...\n");
 	fprintf(stderr, "\tFunktsioon f on valmis!\n");
 	fprintf(stderr, "}\n");
 }
@@ -134,7 +151,9 @@ void h()
 {
 	fprintf(stderr, "\t\th()\n\t\t{\n");
 	fprintf(stderr, "\t\t\t...\n");
-	fprintf(stderr, "\t\t\twait();\n");
+	cond_begin;
+	cond_wait(&the_global_condition);
+	cond_end;
 	fprintf(stderr, "\t\t\t...\n");
 	fprintf(stderr, "\t\t}\n");
 }
@@ -155,5 +174,37 @@ __attribute__((tm_callable)) void h_prime(condition_variable_environment_t* cons
 	fprintf(stderr, "\t\t\t\tAfter second wait() call... \n");
 	fprintf(stderr, "\t\t\t\t...\n");
 	fprintf(stderr, "\t\t\t}\n");
+	return;
+}
+
+
+/*!
+ * \brief performs all the functions of h(), but takes some arguments.
+ */
+void i(int something, char something_else)
+{
+	fprintf(stderr, "\th()\n\t\t{\n");
+	fprintf(stderr, "\t\t...\n");
+	cond_begin;
+	cond_wait(&the_global_condition);
+	cond_end;
+	fprintf(stderr, "\t\t...\n");
+	fprintf(stderr, "\t}\n");
+}
+
+
+/*
+ * i() -- Transactional version.
+ */
+void i_prime(condition_variable_environment_t* const env, int something, char something_else)
+{		
+	fprintf(stderr, "\t\ti'()\n\t\t\t{\n");
+	fprintf(stderr, "\t\t\t...\n");
+	condition_variable_environment_wait(env, &the_global_condition);
+	fprintf(stderr, "\t\t\tAfter first wait() call... \n");
+	condition_variable_environment_wait(env, &the_global_condition);
+	fprintf(stderr, "\t\t\tAfter second wait() call... \n");
+	fprintf(stderr, "\t\t\t...\n");
+	fprintf(stderr, "\t\t}\n");
 	return;
 }

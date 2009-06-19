@@ -52,12 +52,12 @@ typedef struct condition_variable_environment
 #endif
 
 #ifndef condition_variable_environment_call
-#define condition_variable_environment_call(tmid, function)                           \
+#define condition_variable_environment_call(tmid, function, arguments...)             \
 	MAKE_LABEL(before_, function, __LINE__):                                          \
 	                                                                                  \
 	if (first_time)	{                                                                 \
 		env_##tmid.outer_frame.jump_point = &&MAKE_LABEL(after_, function, __LINE__); \
-		function##_prime(&env_##tmid);                                                \
+		function##_prime(&env_##tmid, ##arguments);                                   \
 	}                                                                                 \
 	else	{                                                                         \
 		RESTORE_STACK_AND_PIC_AND_GOTO(env_##tmid.inner_frame.stack_base,             \
