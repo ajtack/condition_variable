@@ -1,3 +1,17 @@
+/*!
+ * \file
+ * \brief Implements a demonstration of lockless conditional wait in transactions.
+ *
+ * The goals of this demonstration are:
+ *  1. To demonstrate lockless conditional waits which escape the containing transaction
+ *     (in place of releasing a lock)
+ *  2. To demonstrate lockless waits to occurring deeper in the stack than the function
+ *     which began the containing transaction
+ *  3. To demonstrate how macros are applied to a semi-realistic code base to meet the
+ *     previous two goals without adding much custom, brittle code to the program.
+ *
+ * \author Andres Jaan Tack (tack@cs.wisc.edu)
+ */
 #include "condition_variable_environment.h"
 #include "condvar/condvar.h"
 #include <pthread.h>
@@ -5,28 +19,64 @@
 #include <stdio.h>
 
 
-// Some global condition which allows us to check actual waiting.
+/*!
+ * This variable is meant to indicate any condition which is accessible both to the
+ * signaler and to the waiter. It has no particular meaning.
+ */
 static cond_event_t the_global_condition;
 
-// Functions which run the experiment across threads.
-void* run_f(void*);
-void* signal_condition(void*);
 
-// Function which encloses the transaction.
+/*
+ * We define here several functions which execute lockless waits in different scenarios,
+ * both within and without a transaction.
+ *
+ * The reader will note that there are two versions of each function. The only difference:
+ * one of them uses a standalone lockless wait, while the other (marked "_prime") uses a
+ * lockless wait given an environment. This environment allows the wait to escape the
+ * appropriate containing transaction.
+ */
+
+// This function drives the experiment, calling the below in
+// various combinations with transactions.
 void f();
 
-// Functions taking no arguments
+// Functions taking no arguments:
+//   g() calls h(),
 void g();
 void g_prime(condition_variable_environment_t* const env);
 
+//   h() waits twice, escaping the transaction in f() to do so.
 void h();
 void h_prime(condition_variable_environment_t* const env);
 
 // Functions taking some arguments
+//   i() behaves as h(), but demonstrates how arguments are to
+//       be shifted over to add the environment.
 void i(int something, char something_else);
 void i_prime(condition_variable_environment_t* const env, int something, char something_else);
 
 
+/*!
+ * Calls f(), runnable as a thread.
+ *
+ * \return NULL
+ */
+void* run_f(void*);
+
+
+/*!
+ * With a period of one second, signals the_global_condition.
+ *
+ * \return Never; expects to be killed by the spawning thread.
+ */
+void* signal_condition(void*);
+
+
+/*!
+ * \brief Runs the demonstration which this file describes.
+ *
+ * The demonstration is self-contained. No additional parameters are required.
+ */
 int main()	{
 	pthread_t signaler;
 	pthread_t waiter;
@@ -42,61 +92,43 @@ int main()	{
 }
 
 
-void* run_f(void* ignored)
-{
-	f();
-	return NULL;
-}
-
-
-void* signal_condition(void* condition)
-{
-	while(true)	{
-		sleep(1);
-		cond_event_tm_signal(condition);
-	}
-	
-	return NULL;
-}
-
-
 void f()
 {
 	fprintf(stderr, "f()\n{\n");
-	fprintf(stderr, "\t// before a non-transactional call to g ...\n");
+	fprintf(stderr, "\t// This section demonstrates correct output without transactions ...\n");
 	g();
-	fprintf(stderr, "\t// after a non-transactional call to g ...\n");
 	fprintf(stderr, "\n");
 	
 	// This block...
 	//
 	// 	fprintf(stderr, "\t__tm_atomic {\n")
 	// 	__tm_atomic {
-	//		fprintf(stderr, "\t\t// before g() ...\n");
+	//		fprintf(stderr, "\t\t// ...\n");
 	// 		g();
-	//		fprintf(stderr, "\t\t// after g() ...\n");
+	//		fprintf(stderr, "\t\t// ...\n");
 	// 	}
 	//	fprintf(stderr, "\t}\n");
 	//
 	// Becomes:
+	fprintf(stderr, "\t// This section demonstrates the same nested functions, but this time in a transaction.\n");
 	fprintf(stderr, "\t__tm_atomic {\n");
 	TM_ATOMIC(SOMETHING_UNIQUE,
-		fprintf(stdout, "\t\tMidagi siia läheb...\n");
+		fprintf(stdout, "\t\t// Preamble to downcall to g() ...\n\n");
 		condition_variable_environment_call(SOMETHING_UNIQUE, g);
-		fprintf(stdout, "\t\tKa siia läheb midagi...\n");
+		fprintf(stdout, "\n\t\t// Postamble to downcall to g() ...\n");
 	)
 	fprintf(stderr, "\t}\n");
 	
-	// Another one, this time passing arguments to a function.
+	fprintf(stderr, "\n\t// This section demonstrates passing arguments to a similar function.\n");
 	fprintf(stderr, "\t__tm_atomic {\n");
 	TM_ATOMIC(SOMETHING_ELSE_UNIQUE,
-		fprintf(stdout, "\t\tNüüd teeme midagi teistmoodi...\n");
+		fprintf(stdout, "\t\t// Preamble to downcall to i() ...\n\n");
 		condition_variable_environment_call(SOMETHING_ELSE_UNIQUE, i, 15, 'x');
-		fprintf(stdout, "\t\tJa veel üks kord tegeleme...\n");
+		fprintf(stdout, "\n\t\t// Postamble to downcall to i() ...\n");
 	)
 	fprintf(stderr, "\t}\n");
 
-	fprintf(stderr, "\tFunktsioon f on valmis!\n");
+	fprintf(stderr, "\n\tIf you see this, the demonstration succeeded!\n");
 	fprintf(stderr, "}\n");
 }
 
@@ -151,9 +183,19 @@ void h()
 {
 	fprintf(stderr, "\t\th()\n\t\t{\n");
 	fprintf(stderr, "\t\t\t...\n");
+	
+	fprintf(stderr, "\t\t\twait();\n");
 	cond_begin;
 	cond_wait(&the_global_condition);
 	cond_end;
+	
+	fprintf(stderr, "\t\t\t...\n");
+	
+	fprintf(stderr, "\t\t\twait();\n");
+	cond_begin;
+	cond_wait(&the_global_condition);
+	cond_end;
+	
 	fprintf(stderr, "\t\t\t...\n");
 	fprintf(stderr, "\t\t}\n");
 }
@@ -168,26 +210,42 @@ __attribute__((tm_callable)) void h_prime(condition_variable_environment_t* cons
 {		
 	fprintf(stderr, "\t\t\th'()\n\t\t\t{\n");
 	fprintf(stderr, "\t\t\t\t...\n");
+	
+	fprintf(stderr, "\t\t\t\twait();\n");
 	condition_variable_environment_wait(env, &the_global_condition);
-	fprintf(stderr, "\t\t\t\tAfter first wait() call... \n");
+	
+	fprintf(stderr, "\t\t\t\t...\n");
+	
+	fprintf(stderr, "\t\t\t\twait();\n");
 	condition_variable_environment_wait(env, &the_global_condition);
-	fprintf(stderr, "\t\t\t\tAfter second wait() call... \n");
+	
 	fprintf(stderr, "\t\t\t\t...\n");
 	fprintf(stderr, "\t\t\t}\n");
+	
 	return;
 }
 
 
 /*!
- * \brief performs all the functions of h(), but takes some arguments.
+ * i() -- Non-Transactional Version.
  */
 void i(int something, char something_else)
 {
 	fprintf(stderr, "\th()\n\t\t{\n");
 	fprintf(stderr, "\t\t...\n");
+	
+	fprintf(stderr, "\t\t\twait();\n");
 	cond_begin;
 	cond_wait(&the_global_condition);
 	cond_end;
+	
+	fprintf(stderr, "\t\t...\n");
+	
+	fprintf(stderr, "\t\t\twait();\n");
+	cond_begin;
+	cond_wait(&the_global_condition);
+	cond_end;
+	
 	fprintf(stderr, "\t\t...\n");
 	fprintf(stderr, "\t}\n");
 }
@@ -198,13 +256,37 @@ void i(int something, char something_else)
  */
 void i_prime(condition_variable_environment_t* const env, int something, char something_else)
 {		
-	fprintf(stderr, "\t\ti'()\n\t\t\t{\n");
+	fprintf(stderr, "\t\ti'()\n\t\t{\n");
 	fprintf(stderr, "\t\t\t...\n");
+	
+	fprintf(stderr, "\t\t\twait();\n");
 	condition_variable_environment_wait(env, &the_global_condition);
-	fprintf(stderr, "\t\t\tAfter first wait() call... \n");
+
+	fprintf(stderr, "\t\t\t...\n");
+	
+	fprintf(stderr, "\t\t\twait();\n");
 	condition_variable_environment_wait(env, &the_global_condition);
-	fprintf(stderr, "\t\t\tAfter second wait() call... \n");
+	
 	fprintf(stderr, "\t\t\t...\n");
 	fprintf(stderr, "\t\t}\n");
+	
 	return;
+}
+
+
+void* run_f(void* ignored)
+{
+	f();
+	return NULL;
+}
+
+
+void* signal_condition(void* condition)
+{
+	while(true)	{
+		sleep(1);
+		cond_event_tm_signal(condition);
+	}
+	
+	return NULL;
 }
