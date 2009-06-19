@@ -1,0 +1,2 @@
+set path = ( $path /scratch/swift/tm/icc/bin )
+setenv LD_LIBRARY_PATH /scratch/swift/tm/icc/lib

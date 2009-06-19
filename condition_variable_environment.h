@@ -1,6 +1,6 @@
 #include "label.h"
 #include <stdbool.h>
-
+#include "condvar/condvar.h"
 
 typedef struct frame
 {
@@ -16,6 +16,7 @@ typedef struct condition_variable_environment
 	frame_t outer_frame;
 	bool active;
 	label current_downcall;
+	cond_event_t* current_condition;
 } condition_variable_environment_t;
 
 
@@ -41,13 +42,14 @@ typedef struct condition_variable_environment
 			                                                                  \
 			first_time = false;                                               \
 			if (env_##tmid.active) {                                          \
-				fprintf(stderr, "\t\t// WAIT!\n");                            \
+				cond_begin;                                                   \
+				cond_wait(env_##tmid.current_condition);                      \
+				cond_end;                                                     \
 			}                                                                 \
 		} while(env_##tmid.active);                                           \
 	}                                                                         \
 
 #endif
-
 
 #ifndef condition_variable_environment_call
 #define condition_variable_environment_call(tmid, function)                           \
@@ -70,6 +72,25 @@ typedef struct condition_variable_environment
 		env_##tmid.current_downcall = NULL;                                           \
 	}                                                                                 \
 
+#endif
+
+#ifndef condition_variable_environment_wait
+#define condition_variable_environment_wait(environment, condition)                               \
+	{                                                                                             \
+		STORE_STACK_BASE_AND_PIC(environment->inner_frame.stack_base,                             \
+		                         environment->inner_frame.pic);                                   \
+		environment->inner_frame.jump_point =                                                     \
+		                         ADDRESS_OF_LABEL(JOIN(_wait_line_, __LINE__));                   \
+		environment->current_condition = condition;                                               \
+		environment->active = true;                                                               \
+		SET_STACK_AND_PIC_AND_GOTO(environment->outer_frame.stack_base,                           \
+		                           environment->outer_frame.pic,                                  \
+		                           environment->outer_frame.jump_point);                          \
+		                                                                                          \
+	JOIN(_wait_line_, __LINE__):                                                                  \
+		environment->active = false;                                                              \
+	}                                                                                             \
+	
 #endif
 
 #ifndef JOIN

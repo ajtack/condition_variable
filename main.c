@@ -1,6 +1,15 @@
-#include <stdio.h>
 #include "condition_variable_environment.h"
+#include "condvar/condvar.h"
+#include <pthread.h>
+#include <signal.h>
+#include <stdio.h>
 
+
+// Some global condition which allows us to check actual waiting.
+static cond_event_t the_global_condition;
+
+void* run_f(void*);
+void* signal_condition(void*);
 void f();
 void g_prime(condition_variable_environment_t* const env);
 void g();
@@ -8,9 +17,37 @@ void h_prime(condition_variable_environment_t* const env);
 void h();
 void wait(int, int);
 
+
 int main()	{
-	f();
+	pthread_t signaler;
+	pthread_t waiter;
+	
+	pthread_create(&waiter, NULL, run_f, NULL);
+	pthread_create(&signaler, NULL, signal_condition, &the_global_condition);
+	
+	pthread_join(waiter, NULL);
+	pthread_kill(signaler, SIGQUIT);
+	pthread_join(signaler, NULL);
+	
 	return 0;
+}
+
+
+void* run_f(void* ignored)
+{
+	f();
+	return NULL;
+}
+
+
+void* signal_condition(void* condition)
+{
+	while(true)	{
+		sleep(1);
+		cond_event_tm_signal(condition);
+	}
+	
+	return NULL;
 }
 
 
@@ -112,31 +149,9 @@ __attribute__((tm_callable)) void h_prime(condition_variable_environment_t* cons
 {		
 	fprintf(stderr, "\t\t\th'()\n\t\t\t{\n");
 	fprintf(stderr, "\t\t\t\t...\n");
-
-	// In place of the wait() ...
-	{
-		STORE_STACK_BASE_AND_PIC(env->inner_frame.stack_base, env->inner_frame.pic);
-		env->inner_frame.jump_point = ADDRESS_OF_LABEL(after_wait_1);
-		env->active = true;
-		SET_STACK_AND_PIC_AND_GOTO(env->outer_frame.stack_base, env->outer_frame.pic, env->outer_frame.jump_point);
-		
-	after_wait_1:
-		env->active = false;
-	}
-	
+	condition_variable_environment_wait(env, &the_global_condition);
 	fprintf(stderr, "\t\t\t\tAfter first wait() call... \n");
-	
-	// In place of the wait() ...
-	{
-		STORE_STACK_BASE_AND_PIC(env->inner_frame.stack_base, env->inner_frame.pic);
-		env->inner_frame.jump_point = ADDRESS_OF_LABEL(after_wait_2);
-		env->active = true;
-		SET_STACK_AND_PIC_AND_GOTO(env->outer_frame.stack_base, env->outer_frame.pic, env->outer_frame.jump_point);
-		
-	after_wait_2:
-		env->active = false;
-	}
-	
+	condition_variable_environment_wait(env, &the_global_condition);
 	fprintf(stderr, "\t\t\t\tAfter second wait() call... \n");
 	fprintf(stderr, "\t\t\t\t...\n");
 	fprintf(stderr, "\t\t\t}\n");
