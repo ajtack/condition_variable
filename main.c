@@ -12,8 +12,7 @@
  *
  * \author Andres Jaan Tack (tack@cs.wisc.edu)
  */
-#include "condition_variable_environment.h"
-#include "condvar/condvar.h"
+#include "environment.h"
 #include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
