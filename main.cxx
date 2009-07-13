@@ -117,6 +117,17 @@ void f()
 	fprintf(stderr, "\t__tm_atomic {\n");
 	TM_ATOMIC(SOMETHING_UNIQUE,
 		fprintf(stdout, "\t\t// Preamble to downcall to g() ...\n\n");
+		{
+			fprintf(stderr, "\t\twait();\n");
+			env_SOMETHING_UNIQUE.current_downcall = &&after_my_goto;
+			env_SOMETHING_UNIQUE.current_condition = &the_global_condition;
+			env_SOMETHING_UNIQUE.active = true;
+			goto SOMETHING_UNIQUE_end;
+		after_my_goto:
+			env_SOMETHING_UNIQUE.current_condition = __null;
+			env_SOMETHING_UNIQUE.active = false;
+		}
+		
 		condition_variable_environment_call(SOMETHING_UNIQUE, g);
 		fprintf(stdout, "\n\t\t// Postamble to downcall to g() ...\n");
 	)
