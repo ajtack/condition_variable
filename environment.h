@@ -23,7 +23,6 @@ typedef struct condition_variable_environment
 #ifndef TM_ATOMIC
 #define TM_ATOMIC(tmid, code)                                                 \
 	{                                                                         \
-		bool first_time = true;                                               \
 		condition_variable_environment_t env_##tmid =                         \
 			{ .active = false, .current_downcall = NULL };                    \
 		                                                                      \
@@ -40,7 +39,6 @@ typedef struct condition_variable_environment
 			tmid##_end:                                                       \
 			}                                                                 \
 			                                                                  \
-			first_time = false;                                               \
 			if (env_##tmid.active) {                                          \
 				cond_begin;                                                   \
 				cond_wait(env_##tmid.current_condition);                      \
@@ -55,13 +53,12 @@ typedef struct condition_variable_environment
 #define condition_variable_environment_call(tmid, function, arguments...)             \
 	MAKE_LABEL(before_, function, __LINE__):                                          \
 	                                                                                  \
-	if (first_time)	{                                                                 \
-		env_##tmid.outer_frame.jump_point = &&MAKE_LABEL(after_, function, __LINE__); \
-		function##_prime(&env_##tmid, ##arguments);                                   \
-	}                                                                                 \
-	else	{                                                                         \
+	if (env_##tmid.active)	{                                                         \
 		RESTORE_STACK_AND_PIC_AND_GOTO(env_##tmid.inner_frame.stack_base,             \
 		    env_##tmid.inner_frame.pic, env_##tmid.inner_frame.jump_point);           \
+	} else {                                                                          \
+		env_##tmid.outer_frame.jump_point = &&MAKE_LABEL(after_, function, __LINE__); \
+		function##_prime(&env_##tmid, ##arguments);                                   \
 	}                                                                                 \
 	                                                                                  \
 	MAKE_LABEL(after_, function, __LINE__):                                           \
