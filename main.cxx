@@ -99,6 +99,10 @@ void f()
 {
 	fprintf(stderr, "f()\n{\n");
 	fprintf(stderr, "\t// This section demonstrates correct output without transactions ...\n");
+	fprintf(stderr, "\twait();\n");
+	cond_begin;
+	cond_wait(&the_global_condition);
+	cond_end;
 	g();
 	fprintf(stderr, "\n");
 	
@@ -117,17 +121,8 @@ void f()
 	fprintf(stderr, "\t__tm_atomic {\n");
 	TM_ATOMIC(SOMETHING_UNIQUE,
 		fprintf(stdout, "\t\t// Preamble to downcall to g() ...\n\n");
-		{
-			fprintf(stderr, "\t\twait();\n");
-			env_SOMETHING_UNIQUE.current_downcall = &&after_my_goto;
-			env_SOMETHING_UNIQUE.current_condition = &the_global_condition;
-			env_SOMETHING_UNIQUE.active = true;
-			goto SOMETHING_UNIQUE_end;
-		after_my_goto:
-			env_SOMETHING_UNIQUE.current_condition = __null;
-			env_SOMETHING_UNIQUE.active = false;
-		}
-		
+		fprintf(stderr, "\t\twait();\n");
+		condition_variable_environment_local_wait(SOMETHING_UNIQUE, &the_global_condition);
 		condition_variable_environment_call(SOMETHING_UNIQUE, g);
 		fprintf(stdout, "\n\t\t// Postamble to downcall to g() ...\n");
 	)
@@ -137,6 +132,8 @@ void f()
 	fprintf(stderr, "\t__tm_atomic {\n");
 	TM_ATOMIC(SOMETHING_ELSE_UNIQUE,
 		fprintf(stdout, "\t\t// Preamble to downcall to i() ...\n\n");
+		fprintf(stderr, "\t\twait();\n");
+		condition_variable_environment_local_wait(SOMETHING_ELSE_UNIQUE, &the_global_condition);
 		condition_variable_environment_call(SOMETHING_ELSE_UNIQUE, i, 15, 'x');
 		fprintf(stdout, "\n\t\t// Postamble to downcall to i() ...\n");
 	)

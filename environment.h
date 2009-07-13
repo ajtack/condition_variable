@@ -71,6 +71,18 @@ typedef struct condition_variable_environment
 
 #endif
 
+#ifndef condition_variable_environment_local_wait
+#define condition_variable_environment_local_wait(tmid, condition)                 \
+	env_##tmid.current_downcall = ADDRESS_OF_LABEL(JOIN(after_wait_, __LINE__));   \
+	env_##tmid.current_condition = condition;                                      \
+	env_##tmid.active = true;                                                      \
+	goto tmid##_end;                                                               \
+JOIN(after_wait_, __LINE__):                                                       \
+	env_##tmid.current_condition = NULL;                                           \
+	env_##tmid.active = false;                                                     \
+	
+#endif
+
 #ifndef condition_variable_environment_wait
 #define condition_variable_environment_wait(environment, condition)                               \
 	{                                                                                             \
