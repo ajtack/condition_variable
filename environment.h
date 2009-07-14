@@ -51,28 +51,31 @@ typedef struct condition_variable_environment
 
 #ifndef condition_variable_environment_call
 #define condition_variable_environment_call(tmid, function, arguments...)             \
-	MAKE_LABEL(before_, function, __LINE__):                                          \
-	                                                                                  \
-	if (env_##tmid.active)	{                                                         \
-		RESTORE_STACK_AND_PIC_AND_GOTO(env_##tmid.inner_frame.stack_base,             \
-		    env_##tmid.inner_frame.pic, env_##tmid.inner_frame.jump_point);           \
-	} else {                                                                          \
-		env_##tmid.outer_frame.jump_point = &&MAKE_LABEL(after_, function, __LINE__); \
-		function##_prime(&env_##tmid, ##arguments);                                   \
-	}                                                                                 \
-	                                                                                  \
-	MAKE_LABEL(after_, function, __LINE__):                                           \
-	if (env_##tmid.active) {                                                          \
-		env_##tmid.current_downcall = &&MAKE_LABEL(before_, function, __LINE__);      \
-		goto tmid##_end;                                                              \
-	} else {                                                                          \
-		env_##tmid.current_downcall = NULL;                                           \
-	}                                                                                 \
+{                                                                                     \
+MAKE_LABEL(before_, function, __LINE__):                                              \
+                                                                                      \
+    if (env_##tmid.active)	{                                                         \
+        RESTORE_STACK_AND_PIC_AND_GOTO(env_##tmid.inner_frame.stack_base,             \
+        env_##tmid.inner_frame.pic, env_##tmid.inner_frame.jump_point);               \
+    } else {                                                                          \
+        env_##tmid.outer_frame.jump_point = &&MAKE_LABEL(after_, function, __LINE__); \
+        function##_prime(&env_##tmid, ##arguments);                                   \
+    }                                                                                 \
+                                                                                      \
+MAKE_LABEL(after_, function, __LINE__):                                               \
+    if (env_##tmid.active) {                                                          \
+        env_##tmid.current_downcall = &&MAKE_LABEL(before_, function, __LINE__);      \
+        goto tmid##_end;                                                              \
+    } else {                                                                          \
+        env_##tmid.current_downcall = NULL;                                           \
+    }                                                                                 \
+}                                                                                     \
 
 #endif
 
 #ifndef condition_variable_environment_local_wait
 #define condition_variable_environment_local_wait(tmid, condition)                 \
+{                                                                                  \
 	env_##tmid.current_downcall = ADDRESS_OF_LABEL(JOIN(after_wait_, __LINE__));   \
 	env_##tmid.current_condition = condition;                                      \
 	env_##tmid.active = true;                                                      \
@@ -80,25 +83,26 @@ typedef struct condition_variable_environment
 JOIN(after_wait_, __LINE__):                                                       \
 	env_##tmid.current_condition = NULL;                                           \
 	env_##tmid.active = false;                                                     \
+}                                                                                  \
 	
 #endif
 
 #ifndef condition_variable_environment_wait
-#define condition_variable_environment_wait(environment, condition)                               \
-	{                                                                                             \
-		STORE_STACK_BASE_AND_PIC(environment->inner_frame.stack_base,                             \
-		                         environment->inner_frame.pic);                                   \
-		environment->inner_frame.jump_point =                                                     \
-		                         ADDRESS_OF_LABEL(JOIN(_wait_line_, __LINE__));                   \
-		environment->current_condition = condition;                                               \
-		environment->active = true;                                                               \
-		SET_STACK_AND_PIC_AND_GOTO(environment->outer_frame.stack_base,                           \
-		                           environment->outer_frame.pic,                                  \
-		                           environment->outer_frame.jump_point);                          \
-		                                                                                          \
-	JOIN(_wait_line_, __LINE__):                                                                  \
-		environment->active = false;                                                              \
-	}                                                                                             \
+#define condition_variable_environment_wait(environment, condition)                           \
+{                                                                                             \
+    STORE_STACK_BASE_AND_PIC(environment->inner_frame.stack_base,                             \
+                             environment->inner_frame.pic);                                   \
+    environment->inner_frame.jump_point =                                                     \
+                             ADDRESS_OF_LABEL(JOIN(_wait_line_, __LINE__));                   \
+    environment->current_condition = condition;                                               \
+    environment->active = true;                                                               \
+    SET_STACK_AND_PIC_AND_GOTO(environment->outer_frame.stack_base,                           \
+                               environment->outer_frame.pic,                                  \
+                               environment->outer_frame.jump_point);                          \
+                                                                                              \
+JOIN(_wait_line_, __LINE__):                                                                  \
+    environment->active = false;                                                              \
+}                                                                                             \
 	
 #endif
 
