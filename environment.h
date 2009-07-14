@@ -54,7 +54,7 @@ typedef struct condition_variable_environment
 {                                                                                     \
 MAKE_LABEL(before_, function, __LINE__):                                              \
                                                                                       \
-    if (env_##tmid.active)	{                                                         \
+    if (env_##tmid.active) {                                                          \
         RESTORE_STACK_AND_PIC_AND_GOTO(env_##tmid.inner_frame.stack_base,             \
         env_##tmid.inner_frame.pic, env_##tmid.inner_frame.jump_point);               \
     } else {                                                                          \
@@ -76,13 +76,13 @@ MAKE_LABEL(after_, function, __LINE__):                                         
 #ifndef condition_variable_environment_local_wait
 #define condition_variable_environment_local_wait(tmid, condition)                 \
 {                                                                                  \
-	env_##tmid.current_downcall = ADDRESS_OF_LABEL(JOIN(after_wait_, __LINE__));   \
-	env_##tmid.current_condition = condition;                                      \
-	env_##tmid.active = true;                                                      \
-	goto tmid##_end;                                                               \
+    env_##tmid.current_downcall = ADDRESS_OF_LABEL(JOIN(after_wait_, __LINE__));   \
+    env_##tmid.current_condition = condition;                                      \
+    env_##tmid.active = true;                                                      \
+    goto tmid##_end;                                                               \
 JOIN(after_wait_, __LINE__):                                                       \
-	env_##tmid.current_condition = NULL;                                           \
-	env_##tmid.active = false;                                                     \
+    env_##tmid.current_condition = NULL;                                           \
+    env_##tmid.active = false;                                                     \
 }                                                                                  \
 	
 #endif
