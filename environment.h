@@ -1,3 +1,6 @@
+#ifndef ENVIRONMENT_H_WYJOI89K
+#define ENVIRONMENT_H_WYJOI89K
+
 #include "label.h"
 #include <stdbool.h>
 #include "condvar/condvar.h"
@@ -50,40 +53,53 @@ typedef struct condition_variable_environment
 #endif
 
 #ifndef condition_variable_environment_call
-#define condition_variable_environment_call(tmid, function, arguments...)             \
-{                                                                                     \
-MAKE_LABEL(before_, function, __LINE__):                                              \
-                                                                                      \
-    if (env_##tmid.active) {                                                          \
-        RESTORE_STACK_AND_PIC_AND_GOTO(env_##tmid.inner_frame.stack_base,             \
-        env_##tmid.inner_frame.pic, env_##tmid.inner_frame.jump_point);               \
-    } else {                                                                          \
-        env_##tmid.outer_frame.jump_point = &&MAKE_LABEL(after_, function, __LINE__); \
-        function##_prime(&env_##tmid, ##arguments);                                   \
-    }                                                                                 \
-                                                                                      \
-MAKE_LABEL(after_, function, __LINE__):                                               \
-    if (env_##tmid.active) {                                                          \
-        env_##tmid.current_downcall = &&MAKE_LABEL(before_, function, __LINE__);      \
-        goto tmid##_end;                                                              \
-    } else {                                                                          \
-        env_##tmid.current_downcall = NULL;                                           \
-    }                                                                                 \
-}                                                                                     \
+#define condition_variable_environment_call(tmid, function, arguments...)                  \
+        condition_variable_environment_call_unique(tmid, __COUNTER__, function, arguments) \
+
+#endif
+
+#ifndef condition_variable_environment_call_unique
+#define condition_variable_environment_call_unique(tmid, counter, function, arguments...)  \
+{                                                                                          \
+MAKE_LABEL(before_, function, counter):                                                    \
+                                                                                           \
+    if (env_##tmid.active) {                                                               \
+        RESTORE_STACK_AND_PIC_AND_GOTO(env_##tmid.inner_frame.stack_base,                  \
+        env_##tmid.inner_frame.pic, env_##tmid.inner_frame.jump_point);                    \
+    } else {                                                                               \
+        env_##tmid.outer_frame.jump_point = &&MAKE_LABEL(after_, function, counter);       \
+        function##_prime(&env_##tmid, ##arguments);                                        \
+    }                                                                                      \
+                                                                                           \
+MAKE_LABEL(after_, function, counter):                                                     \
+    if (env_##tmid.active) {                                                               \
+        env_##tmid.current_downcall = &&MAKE_LABEL(before_, function, counter);            \
+        goto tmid##_end;                                                                   \
+    } else {                                                                               \
+        env_##tmid.current_downcall = NULL;                                                \
+    }                                                                                      \
+}                                                                                          \
 
 #endif
 
 #ifndef condition_variable_environment_local_wait
-#define condition_variable_environment_local_wait(tmid, condition)                 \
-{                                                                                  \
-    env_##tmid.current_downcall = ADDRESS_OF_LABEL(JOIN(after_wait_, __LINE__));   \
-    env_##tmid.current_condition = condition;                                      \
-    env_##tmid.active = true;                                                      \
-    goto tmid##_end;                                                               \
-JOIN(after_wait_, __LINE__):                                                       \
-    env_##tmid.current_condition = NULL;                                           \
-    env_##tmid.active = false;                                                     \
-}                                                                                  \
+#define condition_variable_environment_local_wait(tmid, condition)                     \
+        condition_variable_environment_local_wait_unique(tmid, __COUNTER__, condition) \
+
+#endif
+
+
+#ifndef condition_variable_environment_local_wait_unique
+#define condition_variable_environment_local_wait_unique(tmid, counter, condition)                \
+{                                                                                                 \
+    env_##tmid.current_downcall = ADDRESS_OF_LABEL(MAKE_LABEL(after_wait_, __LINE__, counter));   \
+    env_##tmid.current_condition = condition;                                                     \
+    env_##tmid.active = true;                                                                     \
+    goto tmid##_end;                                                                              \
+MAKE_LABEL(after_wait_, __LINE__, counter):                                                       \
+    env_##tmid.current_condition = NULL;                                                          \
+    env_##tmid.active = false;                                                                    \
+}                                                                                                 \
 	
 #endif
 
@@ -117,3 +133,5 @@ JOIN(_wait_line_, __LINE__):                                                    
 #ifndef MAKE_LABEL
 #define MAKE_LABEL(name, x, y) JOIN(name, JOIN(x, y))
 #endif
+
+#endif /* end of include guard: ENVIRONMENT_H_WYJOI89K */
