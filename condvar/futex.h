@@ -7,7 +7,10 @@ typedef struct cond_event {
 } cond_event_t;
 
 #define ESCAPE __attribute__((tm_pure)) 
-#define TM  __attribute__((tm_callable)) 
+#define TM  __attribute__((tm_callable))
+#define TM_CALLABLE __attribute__((tm_callable))
+#define TM_SAFE __attribute__((tm_safe))
+#define TM_PURE __attribute__((tm_pure))
 
 ESCAPE int futex_wait(void * futex, int val);
 ESCAPE int futex_wake(void * futex, int nwake);
